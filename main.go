@@ -33,15 +33,6 @@ var (
 	pCompiledPropertiesRegex *regexp.Regexp // compiled from propertiesRegex
 )
 
-func convert_iso_8859_1_to_utf_8_string(iso_8859_1 []byte) (utf_8 []byte, err error) {
-	utf_8, err = decoder.Bytes(iso_8859_1)
-	if err != nil {
-		return
-	}
-
-	return
-}
-
 func write_utf_8(pFd *os.File, utf_8 []byte) (err error) {
 	var iso_8859_1 []byte
 	iso_8859_1, err = encoder.Bytes(utf_8)
@@ -68,7 +59,7 @@ func getProps(filename string) (result []byte, err error) {
 		return
 	}
 
-	result, err = convert_iso_8859_1_to_utf_8_string(result_iso_8859_1)
+	result, err = decoder.Bytes(result_iso_8859_1)
 
 	return
 }
