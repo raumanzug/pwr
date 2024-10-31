@@ -29,7 +29,7 @@ const (
 
 var (
 	decoder                  = charmap.ISO8859_1.NewDecoder()
-	encoder                  = charmap.ISO8859_1.NewDecoder()
+	encoder                  = charmap.ISO8859_1.NewEncoder()
 	pCompiledPropertiesRegex *regexp.Regexp // compiled from propertiesRegex
 )
 
