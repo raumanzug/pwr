@@ -32,14 +32,14 @@ var (
 	pCompiledPropertiesRegex *regexp.Regexp // compiled from propertiesRegex
 )
 
-func convert_iso_8859_1_to_utf_8_string (iso_8859_1 []byte) (utf_8_string string, err error) {
+func convert_iso_8859_1_to_utf_8_string(iso_8859_1 []byte) (utf_8_string string, err error) {
 	var utf_8 []byte
 
-	utf_8, err =  decoder.Bytes(iso_8859_1)
+	utf_8, err = decoder.Bytes(iso_8859_1)
 	if err != nil {
 		return
 	}
-	utf_8_string =  string(utf_8)
+	utf_8_string = string(utf_8)
 
 	return
 }
@@ -106,6 +106,7 @@ func outProps(dict map[string]*[]byte, pCliParams *cliParams) (err error) {
 		}
 		curTargetPropsIndex = submatches[5]
 	}
+	_, err = targetFile.Write(TargetProps[curTargetPropsIndex:])
 
 	return
 }
