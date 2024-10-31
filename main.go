@@ -29,17 +29,27 @@ const (
 
 var (
 	decoder                  = charmap.ISO8859_1.NewDecoder()
+	encoder                  = charmap.ISO8859_1.NewDecoder()
 	pCompiledPropertiesRegex *regexp.Regexp // compiled from propertiesRegex
 )
 
-func convert_iso_8859_1_to_utf_8_string(iso_8859_1 []byte) (utf_8_string string, err error) {
-	var utf_8 []byte
-
+func convert_iso_8859_1_to_utf_8_string(iso_8859_1 []byte) (utf_8 []byte, err error) {
 	utf_8, err = decoder.Bytes(iso_8859_1)
 	if err != nil {
 		return
 	}
-	utf_8_string = string(utf_8)
+
+	return
+}
+
+func write_utf_8(pFd *os.File, utf_8 []byte) (err error) {
+	var iso_8859_1 []byte
+	iso_8859_1, err = encoder.Bytes(utf_8)
+	if err != nil {
+		return
+	}
+
+	_, err = pFd.Write(iso_8859_1)
 
 	return
 }
@@ -52,16 +62,19 @@ func getProps(filename string) (result []byte, err error) {
 	}
 	defer file.Close()
 
-	result, err = io.ReadAll(file)
+	var result_iso_8859_1 []byte
+	result_iso_8859_1, err = io.ReadAll(file)
 	if err != nil {
 		return
 	}
+
+	result, err = convert_iso_8859_1_to_utf_8_string(result_iso_8859_1)
 
 	return
 }
 
 // weaves parameter setting determined by a dict into the target .properties file
-func outProps(dict map[string]*[]byte, pCliParams *cliParams) (err error) {
+func outProps(dict map[string][]byte, pCliParams *cliParams) (err error) {
 	TargetProps, err := getProps(pCliParams.targetFilename)
 	if err != nil {
 		return
@@ -85,28 +98,23 @@ func outProps(dict map[string]*[]byte, pCliParams *cliParams) (err error) {
 	defer targetFile.Close()
 
 	curTargetPropsIndex := 0
-	for _, submatches := range pCompiledPropertiesRegex.FindAllSubmatchIndex(TargetProps, -1) {
-		k_iso_8859_1 := TargetProps[submatches[2]:submatches[3]]
-		var key string
-		key, err = convert_iso_8859_1_to_utf_8_string(k_iso_8859_1)
-		if err != nil {
-			return
-		}
-		pV := dict[key]
-		if pV == nil {
+	for _, submatches := range pCompiledPropertiesRegex.FindAllSubmatchIndex([]byte(TargetProps), -1) {
+		key := string(TargetProps[submatches[2]:submatches[3]])
+		v, nonvoid := dict[key]
+		if !nonvoid {
 			continue
 		}
-		_, err = targetFile.Write(TargetProps[curTargetPropsIndex:submatches[4]])
+		err = write_utf_8(targetFile, TargetProps[curTargetPropsIndex:submatches[4]])
 		if err != nil {
 			return
 		}
-		_, err = targetFile.Write(*pV)
+		err = write_utf_8(targetFile, v)
 		if err != nil {
 			return
 		}
 		curTargetPropsIndex = submatches[5]
 	}
-	_, err = targetFile.Write(TargetProps[curTargetPropsIndex:])
+	err = write_utf_8(targetFile, TargetProps[curTargetPropsIndex:])
 
 	return
 }
@@ -115,7 +123,7 @@ func outProps(dict map[string]*[]byte, pCliParams *cliParams) (err error) {
 How does it works?
 
  1. read in source .properties file into a []byte (using procedure getProps).
- 2. parses this []byte and find the key/value pairs, create a dict[string]*[]byte
+ 2. parses this []byte and find the key/value pairs, create a dict[string]string
     which assigns keys to values.
  3. backup target .properties file
  4. read in backup target .properties file into a []byte (using procedure getProps).
@@ -139,16 +147,11 @@ func main() {
 	}
 
 	// 2.
-	dict := make(map[string]*[]byte)
+	dict := make(map[string][]byte)
 	for _, submatches := range pCompiledPropertiesRegex.FindAllSubmatchIndex(sourceProps, -1) {
-		k_iso_8859_1 := sourceProps[submatches[2]:submatches[3]]
-		var key string
-		key, err = convert_iso_8859_1_to_utf_8_string(k_iso_8859_1)
-		if err != nil {
-			log.Fatal(err)
-		}
-		value := (sourceProps[submatches[4]:submatches[5]])
-		dict[key] = &value
+		key := string(sourceProps[submatches[2]:submatches[3]])
+		value := sourceProps[submatches[4]:submatches[5]]
+		dict[key] = value
 	}
 
 	// 3., 4., 5.
